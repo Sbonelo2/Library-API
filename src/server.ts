@@ -2,6 +2,7 @@ import express from "express";
 import bodyParser from "body-parser";
 import { logger, errorHandler } from "./middleware";
 import authorRoutes from "./routes/authors";
+import bookRoutes from "./routes/books";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,6 +13,7 @@ app.use(logger);
 
 // Routes
 app.use("/authors", authorRoutes);
+app.use("/books", bookRoutes);
 
 // Error handler
 app.use(errorHandler);

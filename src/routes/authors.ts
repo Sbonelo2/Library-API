@@ -7,6 +7,7 @@ import {
   updateAuthor,
   deleteAuthor,
 } from "../models/author";
+import { findBooksByAuthorId } from "../models/book";
 import { ApiError } from "../middleware";
 
 const router = Router();
@@ -68,6 +69,20 @@ router.delete("/:id", (req: Request, res: Response, next: NextFunction) => {
       throw new ApiError(404, "Author not found");
     }
     res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get books by author ID
+router.get("/:id/books", (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const author = findAuthorById(req.params.id);
+    if (!author) {
+      throw new ApiError(404, "Author not found");
+    }
+    const books = findBooksByAuthorId(req.params.id);
+    res.json(books);
   } catch (error) {
     next(error);
   }
