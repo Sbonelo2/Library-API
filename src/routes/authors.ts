@@ -91,8 +91,86 @@ router.get("/:id/books", (req: Request, res: Response, next: NextFunction) => {
     if (!author) {
       throw new ApiError(404, "Author not found");
     }
-    const books = findBooksByAuthorId(req.params.id);
-    res.json(books);
+
+    // Query params: q, genre, minYear, maxYear, sort, page, limit
+    const q = (req.query.q as string | undefined)?.trim();
+    const genre = (req.query.genre as string | undefined)?.trim();
+    const minYear = req.query.minYear ? Number(req.query.minYear) : undefined;
+    const maxYear = req.query.maxYear ? Number(req.query.maxYear) : undefined;
+    const sort = (req.query.sort as string | undefined) || "publishedYear:desc";
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
+
+    let results = findBooksByAuthorId(req.params.id);
+
+    // Searching (q) across title, isbn, genre
+    if (q) {
+      const qLower = q.toLowerCase();
+      results = results.filter(
+        (b) =>
+          b.title.toLowerCase().includes(qLower) ||
+          b.isbn.toLowerCase().includes(qLower) ||
+          (b.genre || "").toLowerCase().includes(qLower)
+      );
+    }
+
+    // Genre filter
+    if (genre) {
+      const gLower = genre.toLowerCase();
+      results = results.filter((b) => (b.genre || "").toLowerCase() === gLower);
+    }
+
+    // Year range filter
+    if (!isNaN(Number(minYear))) {
+      results = results.filter((b) => b.publishedYear >= (minYear as number));
+    }
+    if (!isNaN(Number(maxYear))) {
+      results = results.filter((b) => b.publishedYear <= (maxYear as number));
+    }
+
+    // Sorting
+    const [sortFieldRaw, sortDirRaw] = sort.split(":");
+    const sortField = sortFieldRaw || "publishedYear";
+    const sortDir = (sortDirRaw || "desc").toLowerCase();
+    const allowedSortFields = new Set([
+      "title",
+      "publishedYear",
+      "createdAt",
+      "updatedAt",
+    ]);
+    if (!allowedSortFields.has(sortField)) {
+      throw new ApiError(400, `Invalid sort field: ${sortField}`);
+    }
+
+    results.sort((a, b) => {
+      let av: any = (a as any)[sortField];
+      let bv: any = (b as any)[sortField];
+      // normalize dates
+      if (av instanceof Date) av = av.getTime();
+      if (bv instanceof Date) bv = bv.getTime();
+      if (typeof av === "string") av = av.toLowerCase();
+      if (typeof bv === "string") bv = bv.toLowerCase();
+
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    // Pagination
+    const total = results.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const start = (page - 1) * limit;
+    const paged = results.slice(start, start + limit);
+
+    res.json({
+      data: paged,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+      },
+    });
   } catch (error) {
     next(error);
   }
