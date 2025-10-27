@@ -52,6 +52,21 @@ router.post(
   validateBook,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Prevent duplicate ISBN
+      const existingIsbn = books.find(
+        (b) =>
+          b.isbn.trim().toLowerCase() ===
+          (req.body.isbn || "").trim().toLowerCase()
+      );
+      if (existingIsbn) {
+        throw new ApiError(
+          409,
+          "Book with this ISBN already exists",
+          "conflict",
+          { field: "isbn" }
+        );
+      }
+
       const book = createBook(req.body);
       res.status(201).json(book);
     } catch (error) {
@@ -84,6 +99,24 @@ router.put(
   validateBook,
   (req: Request, res: Response, next: NextFunction) => {
     try {
+      // If updating ISBN, ensure it doesn't conflict with another book
+      if (req.body.isbn) {
+        const conflict = books.find(
+          (b) =>
+            b.id !== req.params.id &&
+            b.isbn.trim().toLowerCase() ===
+              (req.body.isbn || "").trim().toLowerCase()
+        );
+        if (conflict) {
+          throw new ApiError(
+            409,
+            "Another book with this ISBN already exists",
+            "conflict",
+            { field: "isbn" }
+          );
+        }
+      }
+
       const book = updateBook(req.params.id, req.body);
       if (!book) {
         throw new ApiError(404, "Book not found");

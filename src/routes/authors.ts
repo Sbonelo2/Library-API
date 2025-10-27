@@ -19,6 +19,16 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       throw new ApiError(400, "Author name is required");
     }
 
+    // Prevent duplicate authors by name (case-insensitive)
+    const existing = authors.find(
+      (a) => a.name.trim().toLowerCase() === req.body.name.trim().toLowerCase()
+    );
+    if (existing) {
+      throw new ApiError(409, "Author already exists", "conflict", {
+        field: "name",
+      });
+    }
+
     const author = createAuthor(req.body);
     res.status(201).json(author);
   } catch (error) {
